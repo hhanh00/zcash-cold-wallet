@@ -1,6 +1,8 @@
 # ZCash Cold Wallet
 
-***At this moment, it only works with TESTNET coins!***
+***By default this will work with TESTNET coins***
+
+See the section below for mainnet coins
 
 This is a paper wallet generator and a cold wallet for ZCash. You can create a new
 sapling wallet or use your own if you have the secret key.
@@ -132,9 +134,22 @@ SendResponse { error_code: 0, error_message: "\"86a82d880bd3394390613aabc9919f2d
 This means that everything went well and the tx id is `86a82d880bd3394390613aabc9919f2de9c1c1b28d95011ef4828bcd8f43b4bf`
 See it on the testnet explorer: [here](https://explorer.testnet.z.cash/tx/86a82d880bd3394390613aabc9919f2de9c1c1b28d95011ef4828bcd8f43b4bf)
 
+# Mainnet
+
+If you want to use this tool for mainnet coins, this tool was not reviewed
+or approved by the ECC. As such, you do it at your own risk. 
+**I am not responsible for any potential loss of money.**
+
+To use mainnet, you need to compile to tool passing the feature flag `mainnet`
+
+~~~
+cargo build --features mainnet
+~~~
+
+
 # TODO
 
-- Allow for mainnet usage with a feature flag
+- Handle reorgs
 
 
 

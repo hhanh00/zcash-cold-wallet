@@ -1,9 +1,8 @@
 use crate::checkpoint::CHECKPOINT;
+use crate::constants::{HRP_SAPLING_EXTENDED_FULL_VIEWING_KEY, NETWORK};
 use crate::{
-    grpc::{
-        compact_tx_streamer_client::CompactTxStreamerClient, BlockId, BlockRange, ChainSpec,
-    },
-    Result, CACHE_PATH, DATA_PATH,
+    grpc::{compact_tx_streamer_client::CompactTxStreamerClient, BlockId, BlockRange, ChainSpec},
+    Opt, Result, WalletError, CACHE_PATH, DATA_PATH, MAX_REORG_DEPTH,
 };
 use prost::bytes::BytesMut;
 use prost::Message;
@@ -16,11 +15,10 @@ use zcash_client_sqlite::{
     BlockDB, WalletDB,
 };
 use zcash_primitives::block::BlockHash;
-use zcash_primitives::consensus::{BlockHeight, Network};
-use zcash_primitives::constants::testnet::HRP_SAPLING_EXTENDED_FULL_VIEWING_KEY;
+use zcash_primitives::consensus::BlockHeight;
 
 pub fn init_db() -> Result<()> {
-    let db_data = WalletDB::for_path(DATA_PATH, Network::TestNetwork)?;
+    let db_data = WalletDB::for_path(DATA_PATH, NETWORK)?;
     init_wallet_db(&db_data)?;
 
     let db_cache = BlockDB::for_path(CACHE_PATH)?;
@@ -30,10 +28,10 @@ pub fn init_db() -> Result<()> {
 }
 
 pub fn init_account(viewing_key: String) -> Result<()> {
-    let db_data = WalletDB::for_path(DATA_PATH, Network::TestNetwork)?;
+    let db_data = WalletDB::for_path(DATA_PATH, NETWORK)?;
     let extfvks =
         decode_extended_full_viewing_key(HRP_SAPLING_EXTENDED_FULL_VIEWING_KEY, &viewing_key)?
-            .expect("Cannot decode viewing key");
+            .ok_or(WalletError::Decode(viewing_key))?;
     init_accounts_table(&db_data, &[extfvks])?;
 
     init_blocks_table(
@@ -46,8 +44,8 @@ pub fn init_account(viewing_key: String) -> Result<()> {
     Ok(())
 }
 
-pub async fn sync(lightnode_url: &str) -> Result<()> {
-    let lightnode_url = lightnode_url.to_string();
+pub async fn sync(opts: &Opt) -> Result<()> {
+    let lightnode_url = &opts.lightnode_url;
     let cache_connection = Connection::open(CACHE_PATH)?;
 
     let start_height: u64 = cache_connection
@@ -57,12 +55,13 @@ pub async fn sync(lightnode_url: &str) -> Result<()> {
         .unwrap_or(CHECKPOINT.height as u64);
     println!("Starting height: {}", start_height);
 
-    let mut client = CompactTxStreamerClient::connect(lightnode_url).await?;
+    let mut client = CompactTxStreamerClient::connect(lightnode_url.clone()).await?;
     let latest_block = client
         .get_latest_block(tonic::Request::new(ChainSpec {}))
         .await?
         .into_inner();
 
+    let synced_height = latest_block.height - MAX_REORG_DEPTH;
     let mut blocks = client
         .get_block_range(tonic::Request::new(BlockRange {
             start: Some(BlockId {
@@ -71,7 +70,7 @@ pub async fn sync(lightnode_url: &str) -> Result<()> {
             }),
             end: Some(BlockId {
                 hash: Vec::new(),
-                height: latest_block.height,
+                height: synced_height,
             }),
         }))
         .await?
@@ -85,12 +84,12 @@ pub async fn sync(lightnode_url: &str) -> Result<()> {
         statement.execute(params![cb.height as u32, cb_bytes.to_vec()])?;
     }
 
-    println!("Synced to {}", latest_block.height);
+    println!("Synced to {}", synced_height);
 
     let cache = BlockDB::for_path(CACHE_PATH)?;
-    let db_read = WalletDB::for_path(DATA_PATH, Network::TestNetwork)?;
+    let db_read = WalletDB::for_path(DATA_PATH, NETWORK)?;
     let mut data = db_read.get_update_ops()?;
-    scan_cached_blocks(&Network::TestNetwork, &cache, &mut data, None)?;
+    scan_cached_blocks(&NETWORK, &cache, &mut data, None)?;
 
     println!("Scan completed");
     Ok(())
@@ -99,7 +98,7 @@ pub async fn sync(lightnode_url: &str) -> Result<()> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::LIGHTNODE_URL;
+    use crate::{ZECUnit, LIGHTNODE_URL};
 
     #[test]
     fn test_init() -> Result<()> {
@@ -110,6 +109,10 @@ mod test {
 
     #[tokio::test]
     async fn test_sync() -> Result<()> {
-        sync(LIGHTNODE_URL).await
+        let opts = Opt {
+            lightnode_url: LIGHTNODE_URL.to_string(),
+            unit: ZECUnit::Zat,
+        };
+        sync(&opts).await
     }
 }

@@ -1,36 +1,19 @@
-use crate::{
-    grpc::{compact_tx_streamer_client::CompactTxStreamerClient, RawTransaction},
-    Result, Tx, TxIn, TxOut, ACCOUNT, DATA_PATH,
-};
-use std::fmt::Formatter;
+use crate::constants::{HRP_SAPLING_PAYMENT_ADDRESS, NETWORK};
+use crate::{grpc::{compact_tx_streamer_client::CompactTxStreamerClient, RawTransaction}, Opt, Result, Tx, TxIn, TxOut, ACCOUNT, DATA_PATH, WalletError};
 use zcash_client_backend::{
     address::RecipientAddress, data_api::WalletRead, encoding::encode_payment_address,
 };
 use zcash_client_sqlite::WalletDB;
 use zcash_primitives::{
-    consensus::Network::TestNetwork,
-    constants::testnet::HRP_SAPLING_PAYMENT_ADDRESS,
     primitives::Rseed,
     transaction::components::{amount::DEFAULT_FEE, Amount},
 };
 
-#[derive(Debug, Clone)]
-pub enum WalletError {
-    NotEnoughFunds(String),
-    Zip212NotImplemented, // Need to implement after Canopy
-}
-
-impl std::error::Error for WalletError {}
-impl std::fmt::Display for WalletError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
-    }
-}
-
-pub fn prepare_tx(to_addr: &str, amount: u64) -> Result<Tx> {
-    let to_addr = RecipientAddress::decode(&TestNetwork, to_addr).expect("Unable to decode address");
-    let amount = Amount::from_u64(amount).expect("Invalid amount");
-    let wallet_db = WalletDB::for_path(DATA_PATH, TestNetwork)?;
+pub fn prepare_tx(to_addr: &str, amount: String, opts: &Opt) -> Result<Tx> {
+    let satoshis = opts.unit.to_satoshis(&amount);
+    let to_addr = RecipientAddress::decode(&NETWORK, to_addr).ok_or(WalletError::Decode(to_addr.to_string()))?;
+    let amount = Amount::from_u64(satoshis).expect("Invalid amount");
+    let wallet_db = WalletDB::for_path(DATA_PATH, NETWORK)?;
     let fvks = wallet_db.get_extended_full_viewing_keys()?;
     let extfvk = &fvks[&ACCOUNT];
     let ovk = extfvk.fvk.ovk;
@@ -44,10 +27,10 @@ pub fn prepare_tx(to_addr: &str, amount: u64) -> Result<Tx> {
     // Confirm we were able to select sufficient value
     let selected_value: Amount = spendable_notes.iter().map(|n| n.note_value).sum();
     if selected_value < target_value {
-        return Err(WalletError::NotEnoughFunds(format!(
-            "Insufficient balance {:?} < {:?}",
-            selected_value, target_value
-        ))
+        return Err(WalletError::NotEnoughFunds(u64::from(selected_value),
+            u64::from(target_value),
+            opts.unit.clone()
+        )
         .into());
     }
 
@@ -68,9 +51,9 @@ pub fn prepare_tx(to_addr: &str, amount: u64) -> Result<Tx> {
         let d = selected.diversifier.0;
         let paddr = encode_payment_address(HRP_SAPLING_PAYMENT_ADDRESS, &from);
         let a = u64::from(selected.note_value);
-        let rseed = match selected.rseed {
-            Rseed::BeforeZip212(s) => s.to_bytes(),
-            _ => return Err(WalletError::Zip212NotImplemented.into()),
+        let (rseed, z212) = match selected.rseed {
+            Rseed::BeforeZip212(s) => (s.to_bytes(), false),
+            Rseed::AfterZip212(s) => (s, true),
         };
         let mut mp = Vec::<u8>::new();
         selected.witness.write(&mut mp)?;
@@ -79,6 +62,7 @@ pub fn prepare_tx(to_addr: &str, amount: u64) -> Result<Tx> {
             diversifier: hex::encode(d),
             addr: paddr,
             amount: a,
+            z212,
             rseed: hex::encode(rseed),
             witness: hex::encode(mp),
         });
@@ -91,7 +75,6 @@ pub fn prepare_tx(to_addr: &str, amount: u64) -> Result<Tx> {
                 addr: encode_payment_address(HRP_SAPLING_PAYMENT_ADDRESS, &to),
                 amount: u64::from(amount),
             });
-            // builder.add_sapling_output(Some(ovk), to.clone(), amount, None)?;
         }
 
         RecipientAddress::Transparent(_) => unimplemented!(),
@@ -100,9 +83,8 @@ pub fn prepare_tx(to_addr: &str, amount: u64) -> Result<Tx> {
     Ok(tx)
 }
 
-pub async fn submit(lightnode_url: &str, raw_tx: RawTransaction) -> Result<()> {
-    let lightnode_url = lightnode_url.to_string();
-    let mut client = CompactTxStreamerClient::connect(lightnode_url).await?;
+pub async fn submit(raw_tx: RawTransaction, opts: &Opt) -> Result<()> {
+    let mut client = CompactTxStreamerClient::connect(opts.lightnode_url.clone()).await?;
     let r = client.send_transaction(raw_tx).await?;
     println!("{:?}", r.into_inner());
 

@@ -111,6 +111,7 @@ pub enum WalletError {
     Decode(String),
     Prover,
     TxParse,
+    AccountNotInitialized,
 }
 
 impl std::error::Error for WalletError {}
@@ -127,6 +128,7 @@ impl std::fmt::Display for WalletError {
             WalletError::Decode(m) => write!(f, "Could not decode {}", m),
             WalletError::Prover => write!(f, "Could not create ZKSnark prover. Did you download the parameters?"),
             WalletError::TxParse => write!(f, "Could not parse transaction file"),
+            WalletError::AccountNotInitialized => write!(f, "Account not initialized. Did you use init-account?"),
         }
     }
 }

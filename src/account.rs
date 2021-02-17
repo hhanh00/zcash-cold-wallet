@@ -6,7 +6,7 @@ pub fn get_balance(opts: &Opt) -> Result<()> {
     let balance = data_connection.query_row(
         "SELECT SUM(value) FROM received_notes WHERE spent IS NULL",
         NO_PARAMS,
-        |row| row.get(0).or(Ok(0)),
+        |row| row.get(0).or(Ok(0i64)),
     )?;
     let balance = opts.unit.from_satoshis(balance as u64);
     println!("Balance: {}", balance);

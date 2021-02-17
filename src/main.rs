@@ -1,16 +1,21 @@
 use clap::Clap;
+use std::fs::File;
 use zcash_coldwallet::sign::sign_tx;
 use zcash_coldwallet::transact::submit;
-use zcash_coldwallet::{account::get_balance, chain::{init_account, init_db, sync}, grpc::RawTransaction, keys::generate_key, transact::prepare_tx, Result, Tx, LIGHTNODE_URL, Opt, ZECUnit, WalletError};
-use std::fs::File;
+use zcash_coldwallet::{
+    account::get_balance,
+    chain::{init_account, init_db, sync},
+    grpc::RawTransaction,
+    keys::generate_key,
+    transact::prepare_tx,
+    Opt, Result, Tx, WalletError, ZECUnit, LIGHTNODE_URL,
+};
 
 #[derive(Clap)]
 struct ZCashColdWallet {
     #[clap(short, long)]
     lightnode_url: Option<String>,
-    #[clap(short, long)]
-    output_file: Option<String>,
-    #[clap(short, long, default_value="Zec")]
+    #[clap(short, long, default_value = "Zec")]
     unit: ZECUnit,
     #[clap(subcommand)]
     cmd: Command,
@@ -18,20 +23,25 @@ struct ZCashColdWallet {
 
 #[derive(Clap)]
 enum Command {
-    Generate,
+    Generate {
+        output_filename: Option<String>,
+    },
     InitDb,
     InitAccount {
         viewing_key: String,
+        birth_height: Option<u32>,
     },
     GetBalance,
     Sync,
     PrepareTx {
         recipient_addr: String,
         amount: String,
+        output_filename: Option<String>,
     },
     Sign {
         spending_key: String,
         tx_json_file: Option<String>,
+        output_filename: Option<String>,
     },
     Submit {
         raw_tx_file: Option<String>,
@@ -46,6 +56,14 @@ fn read_from_file(file_name: Option<String>) -> String {
     let mut s = String::new();
     input.read_to_string(&mut s).unwrap();
     s.trim_end().to_string()
+}
+
+fn create_file(filename: Option<String>) -> Result<Box<dyn std::io::Write>> {
+    let output: Box<dyn std::io::Write> = match filename {
+        Some(file_name) => Box::new(File::create(file_name)?),
+        None => Box::new(std::io::stdout()),
+    };
+    Ok(output)
 }
 
 /*
@@ -69,26 +87,29 @@ async fn main() -> Result<()> {
     };
     let opts = ZCashColdWallet::parse();
     let cmd = opts.cmd;
-    if let Some(lightnode_url) =  opts.lightnode_url {
+    if let Some(lightnode_url) = opts.lightnode_url {
         prog_opt.lightnode_url = lightnode_url;
     }
     prog_opt.unit = opts.unit;
 
-    let mut output: Box<dyn std::io::Write> = match opts.output_file {
-        Some(file_name) => Box::new(File::create(file_name)?),
-        None => Box::new(std::io::stdout()),
-    };
-
     match cmd {
-        Command::Generate => generate_key(&mut output)?,
+        Command::Generate { output_filename } => {
+            let mut output = create_file(output_filename)?;
+            generate_key(&mut output)?
+        },
         Command::InitDb => init_db()?,
-        Command::InitAccount { viewing_key } => init_account(viewing_key)?,
+        Command::InitAccount {
+            viewing_key,
+            birth_height,
+        } => init_account(viewing_key, birth_height.unwrap_or(u32::MAX))?,
         Command::Sync => sync(&prog_opt).await?,
         Command::GetBalance => get_balance(&prog_opt)?,
         Command::PrepareTx {
             amount,
             recipient_addr,
+            output_filename,
         } => {
+            let mut output = create_file(output_filename)?;
             let tx = prepare_tx(&recipient_addr, amount, &prog_opt)?;
             let tx_json = serde_json::to_string(&tx)?;
             writeln!(output, "{}", tx_json)?;
@@ -96,7 +117,9 @@ async fn main() -> Result<()> {
         Command::Sign {
             spending_key,
             tx_json_file,
+            output_filename,
         } => {
+            let mut output = create_file(output_filename)?;
             let tx_json = read_from_file(tx_json_file);
             let tx: Tx = serde_json::from_str(&tx_json).or(Err(WalletError::TxParse))?;
             let raw_tx = sign_tx(&spending_key, &tx, &prog_opt)?;

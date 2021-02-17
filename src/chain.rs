@@ -1,4 +1,3 @@
-use crate::checkpoint::CHECKPOINT;
 use crate::constants::{HRP_SAPLING_EXTENDED_FULL_VIEWING_KEY, NETWORK};
 use crate::{
     grpc::{compact_tx_streamer_client::CompactTxStreamerClient, BlockId, BlockRange, ChainSpec},
@@ -16,6 +15,8 @@ use zcash_client_sqlite::{
 };
 use zcash_primitives::block::BlockHash;
 use zcash_primitives::consensus::BlockHeight;
+use zcash_client_backend::data_api::WalletRead;
+use crate::checkpoint::find_checkpoint;
 
 pub fn init_db() -> Result<()> {
     let db_data = WalletDB::for_path(DATA_PATH, NETWORK)?;
@@ -27,19 +28,20 @@ pub fn init_db() -> Result<()> {
     Ok(())
 }
 
-pub fn init_account(viewing_key: String) -> Result<()> {
+pub fn init_account(viewing_key: String, year: u32) -> Result<()> {
     let db_data = WalletDB::for_path(DATA_PATH, NETWORK)?;
     let extfvks =
         decode_extended_full_viewing_key(HRP_SAPLING_EXTENDED_FULL_VIEWING_KEY, &viewing_key)?
             .ok_or(WalletError::Decode(viewing_key))?;
     init_accounts_table(&db_data, &[extfvks])?;
 
+    let checkpoint = find_checkpoint(year);
     init_blocks_table(
         &db_data,
-        BlockHeight::from_u32(CHECKPOINT.height),
-        BlockHash::from_slice(&CHECKPOINT.hash),
-        CHECKPOINT.time,
-        &hex::decode(CHECKPOINT.sapling_tree).unwrap(),
+        BlockHeight::from_u32(checkpoint.height),
+        BlockHash::from_slice(&checkpoint.hash),
+        checkpoint.time,
+        &hex::decode(checkpoint.sapling_tree).unwrap(),
     )?;
     Ok(())
 }
@@ -47,12 +49,14 @@ pub fn init_account(viewing_key: String) -> Result<()> {
 pub async fn sync(opts: &Opt) -> Result<()> {
     let lightnode_url = &opts.lightnode_url;
     let cache_connection = Connection::open(CACHE_PATH)?;
+    let wallet_db = WalletDB::for_path(DATA_PATH, NETWORK)?;
+    let (_, last_bh) = wallet_db.block_height_extrema()?.ok_or(WalletError::AccountNotInitialized)?;
 
     let start_height: u64 = cache_connection
         .query_row("SELECT MAX(height) FROM compactblocks", NO_PARAMS, |row| {
             Ok(row.get::<_, u32>(0).map(u64::from).map(|h| h + 1).ok())
         })?
-        .unwrap_or(CHECKPOINT.height as u64);
+        .unwrap_or(u64::from(last_bh));
     println!("Starting height: {}", start_height);
 
     let mut client = CompactTxStreamerClient::connect(lightnode_url.clone()).await?;

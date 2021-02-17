@@ -85,8 +85,12 @@ pub fn prepare_tx(to_addr: &str, amount: String, opts: &Opt) -> Result<Tx> {
 
 pub async fn submit(raw_tx: RawTransaction, opts: &Opt) -> Result<()> {
     let mut client = CompactTxStreamerClient::connect(opts.lightnode_url.clone()).await?;
-    let r = client.send_transaction(raw_tx).await?;
-    println!("{:?}", r.into_inner());
+    let r = client.send_transaction(raw_tx).await?.into_inner();
+
+    if r.error_code != 0 {
+        return Err(WalletError::Submit(r.error_code, r.error_message).into())
+    }
+    println!("Success! tx id: {}", r.error_message);
 
     Ok(())
 }

@@ -1,22 +1,24 @@
-use crate::constants::{HRP_SAPLING_EXTENDED_FULL_VIEWING_KEY, NETWORK};
 use crate::{
+    constants::{HRP_SAPLING_EXTENDED_FULL_VIEWING_KEY, NETWORK},
     grpc::{compact_tx_streamer_client::CompactTxStreamerClient, BlockId, BlockRange, ChainSpec},
     Opt, Result, WalletError, CACHE_PATH, DATA_PATH, MAX_REORG_DEPTH,
+    checkpoint::find_checkpoint,
 };
-use prost::bytes::BytesMut;
-use prost::Message;
-use rusqlite::{params, Connection, NO_PARAMS};
-use zcash_client_backend::data_api::chain::scan_cached_blocks;
-use zcash_client_backend::encoding::decode_extended_full_viewing_key;
+use zcash_client_backend::{
+    data_api::{WalletRead, chain::scan_cached_blocks},
+    encoding::decode_extended_full_viewing_key,
+};
 use zcash_client_sqlite::{
     chain::init::init_cache_database,
     wallet::init::{init_accounts_table, init_blocks_table, init_wallet_db},
     BlockDB, WalletDB,
 };
-use zcash_primitives::block::BlockHash;
-use zcash_primitives::consensus::BlockHeight;
-use zcash_client_backend::data_api::WalletRead;
-use crate::checkpoint::find_checkpoint;
+use zcash_primitives::{
+    block::BlockHash,
+    consensus::BlockHeight,
+};
+use prost::{Message, bytes::BytesMut};
+use rusqlite::{params, Connection, NO_PARAMS};
 
 pub fn init_db() -> Result<()> {
     let db_data = WalletDB::for_path(DATA_PATH, NETWORK)?;
@@ -107,7 +109,7 @@ mod test {
     #[test]
     fn test_init() -> Result<()> {
         init_db()?;
-        init_account("zxviewtestsapling1q07ghkk6qqqqpqyqnt30u2gwd5j47fjldmtyunrm99qmaqhp2j3kpqg6k8mvyferpde3vgwndlumht98q29796a6wjujthsxterqh9sjhscaqsmx3tfc6rkt2k9qrkamzpcc5qcskak8cec6ukqysatjxhgdqthh6qnmd53sqfae8nw4z33uletfstrsf0umxpztc365h7vy4jmyw65q6ns5eqkljsquyldn80ssn6hly86zwkx39qvcvzl5psrhj85vcaln6ylacccxrr0kv".to_string())?;
+        init_account("zxviewtestsapling1q07ghkk6qqqqpqyqnt30u2gwd5j47fjldmtyunrm99qmaqhp2j3kpqg6k8mvyferpde3vgwndlumht98q29796a6wjujthsxterqh9sjhscaqsmx3tfc6rkt2k9qrkamzpcc5qcskak8cec6ukqysatjxhgdqthh6qnmd53sqfae8nw4z33uletfstrsf0umxpztc365h7vy4jmyw65q6ns5eqkljsquyldn80ssn6hly86zwkx39qvcvzl5psrhj85vcaln6ylacccxrr0kv".to_string(), 0)?;
         Ok(())
     }
 

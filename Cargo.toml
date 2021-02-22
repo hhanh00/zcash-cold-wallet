@@ -25,6 +25,9 @@ bigdecimal = "0.2.0"
 tracing = "0.1"
 tracing-subscriber = { version = "0.2.7", default-features = false, features = ["fmt", "ansi", "env-filter", "chrono", "tracing-log"] }
 
+thiserror = "1.0.24"
+anyhow = "1.0.38"
+
 [build-dependencies]
 tonic-build = { version = "0.3.1", features = ["prost"] }
 

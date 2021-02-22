@@ -2,6 +2,7 @@ use bigdecimal::{BigDecimal, ToPrimitive};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use zcash_client_backend::wallet::AccountId;
+use thiserror::Error;
 
 pub const DATA_PATH: &str = "data.sqlite3";
 pub const CACHE_PATH: &str = "cache.sqlite3";
@@ -19,8 +20,7 @@ pub mod sign;
 pub mod transact;
 
 pub const ACCOUNT: AccountId = AccountId(0);
-pub type Error = Box<dyn std::error::Error>;
-pub type Result<T> = std::result::Result<T, Error>;
+pub use anyhow::Result as Result;
 
 #[derive(Debug, Clone)]
 pub enum ZECUnit {
@@ -105,43 +105,20 @@ pub struct TxOut {
 
 pub const MAX_REORG_DEPTH: u64 = 3;
 
-#[derive(Debug, Clone)]
+#[derive(Error, Debug, Clone)]
 pub enum WalletError {
+    #[error("Not enough funds: {} < {} {}", .2.from_satoshis(*.0), .2.from_satoshis(*.1), .2)]
     NotEnoughFunds(u64, u64, ZECUnit),
+    #[error("Could not decode {}", .0)]
     Decode(String),
+    #[error("Could not create ZKSnark prover. Did you download the parameters?")]
     Prover,
+    #[error("Could not parse transaction file")]
     TxParse,
+    #[error("Account not initialized. Did you use init-account?")]
     AccountNotInitialized,
+    #[error("Failed to submit transaction. Error code {}, Error Message {}", .0, .1)]
     Submit(i32, String),
-}
-
-impl std::error::Error for WalletError {}
-impl std::fmt::Display for WalletError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            WalletError::NotEnoughFunds(a, b, unit) => write!(
-                f,
-                "Not enough funds: {} < {} {}",
-                unit.from_satoshis(*a),
-                unit.from_satoshis(*b),
-                unit
-            ),
-            WalletError::Decode(m) => write!(f, "Could not decode {}", m),
-            WalletError::Prover => write!(
-                f,
-                "Could not create ZKSnark prover. Did you download the parameters?"
-            ),
-            WalletError::TxParse => write!(f, "Could not parse transaction file"),
-            WalletError::AccountNotInitialized => {
-                write!(f, "Account not initialized. Did you use init-account?")
-            }
-            WalletError::Submit(code, message) => write!(
-                f,
-                "Failed to submit transaction. Error code {}, Error Message {}",
-                code, message
-            ),
-        }
-    }
 }
 
 #[cfg(not(feature = "mainnet"))]

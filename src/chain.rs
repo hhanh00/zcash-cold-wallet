@@ -30,17 +30,17 @@ pub fn init_db() -> Result<()> {
     Ok(())
 }
 
-pub fn init_account(viewing_key: String, year: u32) -> Result<()> {
+pub async fn init_account(lightnode_url: &str, viewing_key: String, height: u64) -> Result<()> {
     let db_data = WalletDB::for_path(DATA_PATH, NETWORK)?;
     let extfvks =
         decode_extended_full_viewing_key(HRP_SAPLING_EXTENDED_FULL_VIEWING_KEY, &viewing_key)?
             .ok_or(WalletError::Decode(viewing_key))?;
     init_accounts_table(&db_data, &[extfvks])?;
 
-    let checkpoint = find_checkpoint(year);
+    let checkpoint = find_checkpoint(lightnode_url, height).await?;
     init_blocks_table(
         &db_data,
-        BlockHeight::from_u32(checkpoint.height),
+        BlockHeight::from_u32(checkpoint.height as u32),
         BlockHash::from_slice(&checkpoint.hash),
         checkpoint.time,
         &hex::decode(checkpoint.sapling_tree).unwrap(),
@@ -109,7 +109,7 @@ mod test {
     #[test]
     fn test_init() -> Result<()> {
         init_db()?;
-        init_account("zxviewtestsapling1q07ghkk6qqqqpqyqnt30u2gwd5j47fjldmtyunrm99qmaqhp2j3kpqg6k8mvyferpde3vgwndlumht98q29796a6wjujthsxterqh9sjhscaqsmx3tfc6rkt2k9qrkamzpcc5qcskak8cec6ukqysatjxhgdqthh6qnmd53sqfae8nw4z33uletfstrsf0umxpztc365h7vy4jmyw65q6ns5eqkljsquyldn80ssn6hly86zwkx39qvcvzl5psrhj85vcaln6ylacccxrr0kv".to_string(), 0)?;
+        init_account(LIGHTNODE_URL, "zxviewtestsapling1q07ghkk6qqqqpqyqnt30u2gwd5j47fjldmtyunrm99qmaqhp2j3kpqg6k8mvyferpde3vgwndlumht98q29796a6wjujthsxterqh9sjhscaqsmx3tfc6rkt2k9qrkamzpcc5qcskak8cec6ukqysatjxhgdqthh6qnmd53sqfae8nw4z33uletfstrsf0umxpztc365h7vy4jmyw65q6ns5eqkljsquyldn80ssn6hly86zwkx39qvcvzl5psrhj85vcaln6ylacccxrr0kv".to_string(), 0)?;
         Ok(())
     }
 

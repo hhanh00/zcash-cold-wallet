@@ -29,7 +29,7 @@ enum Command {
     InitDb,
     InitAccount {
         viewing_key: String,
-        birth_height: Option<u32>,
+        birth_height: Option<u64>,
     },
     GetBalance,
     Sync,
@@ -101,7 +101,7 @@ async fn main() -> Result<()> {
         Command::InitAccount {
             viewing_key,
             birth_height,
-        } => init_account(viewing_key, birth_height.unwrap_or(u32::MAX))?,
+        } => init_account(&prog_opt.lightnode_url, viewing_key, birth_height.unwrap_or(u64::MAX)).await?,
         Command::Sync => sync(&prog_opt).await?,
         Command::GetBalance => get_balance(&prog_opt)?,
         Command::PrepareTx {

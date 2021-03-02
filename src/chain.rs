@@ -1,11 +1,14 @@
 use crate::{
-    constants::{HRP_SAPLING_EXTENDED_FULL_VIEWING_KEY, NETWORK},
-    grpc::{compact_tx_streamer_client::CompactTxStreamerClient, BlockId, BlockRange, ChainSpec},
-    Opt, Result, WalletError, CACHE_PATH, DATA_PATH, MAX_REORG_DEPTH,
     checkpoint::find_checkpoint,
+    connect_lightnode,
+    constants::{HRP_SAPLING_EXTENDED_FULL_VIEWING_KEY, NETWORK},
+    grpc::{BlockId, BlockRange, ChainSpec},
+    Result, WalletError, CACHE_PATH, DATA_PATH, MAX_REORG_DEPTH,
 };
+use prost::{bytes::BytesMut, Message};
+use rusqlite::{params, Connection, NO_PARAMS};
 use zcash_client_backend::{
-    data_api::{WalletRead, chain::scan_cached_blocks},
+    data_api::{chain::scan_cached_blocks, WalletRead},
     encoding::decode_extended_full_viewing_key,
 };
 use zcash_client_sqlite::{
@@ -13,12 +16,7 @@ use zcash_client_sqlite::{
     wallet::init::{init_accounts_table, init_blocks_table, init_wallet_db},
     BlockDB, WalletDB,
 };
-use zcash_primitives::{
-    block::BlockHash,
-    consensus::BlockHeight,
-};
-use prost::{Message, bytes::BytesMut};
-use rusqlite::{params, Connection, NO_PARAMS};
+use zcash_primitives::{block::BlockHash, consensus::BlockHeight};
 
 pub fn init_db() -> Result<()> {
     let db_data = WalletDB::for_path(DATA_PATH, NETWORK)?;
@@ -48,11 +46,13 @@ pub async fn init_account(lightnode_url: &str, viewing_key: String, height: u64)
     Ok(())
 }
 
-pub async fn sync(opts: &Opt) -> Result<()> {
-    let lightnode_url = &opts.lightnode_url;
+pub async fn sync(lightnode_url: &str) -> Result<()> {
+    let lightnode_url = lightnode_url.to_string();
     let cache_connection = Connection::open(CACHE_PATH)?;
     let wallet_db = WalletDB::for_path(DATA_PATH, NETWORK)?;
-    let (_, last_bh) = wallet_db.block_height_extrema()?.ok_or(WalletError::AccountNotInitialized)?;
+    let (_, last_bh) = wallet_db
+        .block_height_extrema()?
+        .ok_or(WalletError::AccountNotInitialized)?;
 
     let start_height: u64 = cache_connection
         .query_row("SELECT MAX(height) FROM compactblocks", NO_PARAMS, |row| {
@@ -61,7 +61,7 @@ pub async fn sync(opts: &Opt) -> Result<()> {
         .unwrap_or(u64::from(last_bh));
     println!("Starting height: {}", start_height);
 
-    let mut client = CompactTxStreamerClient::connect(lightnode_url.clone()).await?;
+    let mut client = connect_lightnode(lightnode_url).await?;
     let latest_block = client
         .get_latest_block(tonic::Request::new(ChainSpec {}))
         .await?
@@ -104,7 +104,7 @@ pub async fn sync(opts: &Opt) -> Result<()> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{ZECUnit, LIGHTNODE_URL};
+    use crate::{constants::LIGHTNODE_URL, ZECUnit};
 
     #[test]
     fn test_init() -> Result<()> {

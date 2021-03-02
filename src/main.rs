@@ -8,7 +8,7 @@ use zcash_coldwallet::{
     grpc::RawTransaction,
     keys::generate_key,
     transact::prepare_tx,
-    Opt, Result, Tx, WalletError, ZECUnit, LIGHTNODE_URL,
+    Opt, Result, Tx, WalletError, ZECUnit, constants::LIGHTNODE_URL,
 };
 
 #[derive(Clap)]
@@ -102,7 +102,7 @@ async fn main() -> Result<()> {
             viewing_key,
             birth_height,
         } => init_account(&prog_opt.lightnode_url, viewing_key, birth_height.unwrap_or(u64::MAX)).await?,
-        Command::Sync => sync(&prog_opt).await?,
+        Command::Sync => sync(&prog_opt.lightnode_url).await?,
         Command::GetBalance => get_balance(&prog_opt)?,
         Command::PrepareTx {
             amount,
@@ -110,7 +110,7 @@ async fn main() -> Result<()> {
             output_filename,
         } => {
             let mut output = create_file(output_filename)?;
-            let tx = prepare_tx(&recipient_addr, amount, &prog_opt)?;
+            let tx = prepare_tx(&recipient_addr, amount, &prog_opt.unit)?;
             let tx_json = serde_json::to_string(&tx)?;
             writeln!(output, "{}", tx_json)?;
         }
@@ -131,7 +131,7 @@ async fn main() -> Result<()> {
                 data: hex::decode(raw_tx)?,
                 height: 0,
             };
-            submit(raw_tx, &prog_opt).await?;
+            submit(raw_tx, &prog_opt.lightnode_url).await?;
         }
     }
 

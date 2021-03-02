@@ -7,7 +7,7 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tonic = { version = "0.3.1", features = ["tls", "tokio"] }
+tonic = { version = "0.3.1", features = ["tls", "tokio", "tls-roots"] }
 tokio = { version = "0.2.13", features = ["macros"] }
 prost = "0.6"
 tiny-bip39 = "0.8"

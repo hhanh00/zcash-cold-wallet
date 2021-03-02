@@ -1,7 +1,4 @@
-use crate::{
-    grpc::{compact_tx_streamer_client::CompactTxStreamerClient, BlockId},
-    Result,
-};
+use crate::{grpc::BlockId, Result, connect_lightnode};
 
 pub struct Checkpoint {
     pub height: u64,
@@ -12,7 +9,7 @@ pub struct Checkpoint {
 
 pub async fn find_checkpoint(lightnode_url: &str, height: u64) -> Result<Checkpoint> {
     let lightnode_url = lightnode_url.to_string();
-    let mut client = CompactTxStreamerClient::connect(lightnode_url).await?;
+    let mut client = connect_lightnode(lightnode_url).await?;
     let tree_state = client.get_tree_state(BlockId { height, hash: Vec::new() }).await?.into_inner();
     let mut hash = hex::decode(tree_state.hash)?;
     hash.reverse();

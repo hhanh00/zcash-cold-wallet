@@ -14,7 +14,7 @@ pub mod grpc {
 
 pub mod account;
 pub mod chain;
-mod checkpoint;
+pub mod checkpoint;
 pub mod keys;
 pub mod sign;
 pub mod transact;
@@ -123,8 +123,11 @@ pub enum WalletError {
 }
 
 async fn connect_lightnode(lightnode_url: String) -> Result<CompactTxStreamerClient<Channel>> {
-    let tls = ClientTlsConfig::new();
-    let channel = tonic::transport::Channel::from_shared(lightnode_url)?.tls_config(tls)?;
+    let mut channel = tonic::transport::Channel::from_shared(lightnode_url.clone())?;
+    if lightnode_url.starts_with("https") {
+        let tls = ClientTlsConfig::new();
+        channel = channel.tls_config(tls)?;
+    }
     let client = CompactTxStreamerClient::connect(channel).await?;
     Ok(client)
 }

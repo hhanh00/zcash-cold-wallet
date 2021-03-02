@@ -5,11 +5,13 @@ use zcash_coldwallet::transact::submit;
 use zcash_coldwallet::{
     account::get_balance,
     chain::{init_account, init_db, sync},
+    checkpoint::find_height,
     grpc::RawTransaction,
     keys::generate_key,
     transact::prepare_tx,
     Opt, Result, Tx, WalletError, ZECUnit, constants::LIGHTNODE_URL,
 };
+use chrono::NaiveDate;
 
 #[derive(Clap)]
 struct ZCashColdWallet {
@@ -29,7 +31,7 @@ enum Command {
     InitDb,
     InitAccount {
         viewing_key: String,
-        birth_height: Option<u64>,
+        birth_day: Option<NaiveDate>,
     },
     GetBalance,
     Sync,
@@ -100,8 +102,15 @@ async fn main() -> Result<()> {
         Command::InitDb => init_db()?,
         Command::InitAccount {
             viewing_key,
-            birth_height,
-        } => init_account(&prog_opt.lightnode_url, viewing_key, birth_height.unwrap_or(u64::MAX)).await?,
+            birth_day,
+        } => {
+            let birth_height = if let Some(birth_day) = birth_day {
+                find_height(&prog_opt.lightnode_url, &birth_day).await?
+            } else {
+                u64::MAX
+            };
+            init_account(&prog_opt.lightnode_url, viewing_key, birth_height).await?
+        },
         Command::Sync => sync(&prog_opt.lightnode_url).await?,
         Command::GetBalance => get_balance(&prog_opt)?,
         Command::PrepareTx {

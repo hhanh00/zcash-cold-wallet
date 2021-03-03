@@ -3,8 +3,8 @@ use std::fs::File;
 use zcash_coldwallet::sign::sign_tx;
 use zcash_coldwallet::transact::submit;
 use zcash_coldwallet::{
-    account::get_balance,
-    chain::{init_account, init_db, sync},
+    account::{init_account, get_balance},
+    chain::{init_db, sync},
     checkpoint::find_height,
     grpc::RawTransaction,
     keys::generate_key,

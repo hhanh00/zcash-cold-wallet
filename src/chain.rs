@@ -1,22 +1,19 @@
 use crate::{
-    checkpoint::find_checkpoint,
     connect_lightnode,
-    constants::{HRP_SAPLING_EXTENDED_FULL_VIEWING_KEY, NETWORK},
+    constants::NETWORK,
     grpc::{BlockId, BlockRange, ChainSpec},
     Result, WalletError, CACHE_PATH, DATA_PATH, MAX_REORG_DEPTH,
 };
 use prost::{bytes::BytesMut, Message};
 use rusqlite::{params, Connection, NO_PARAMS};
 use zcash_client_backend::{
-    data_api::{chain::scan_cached_blocks, WalletRead},
-    encoding::decode_extended_full_viewing_key,
+    data_api::{chain::scan_cached_blocks, WalletRead}
 };
 use zcash_client_sqlite::{
     chain::init::init_cache_database,
-    wallet::init::{init_accounts_table, init_blocks_table, init_wallet_db},
+    wallet::init::init_wallet_db,
     BlockDB, WalletDB,
 };
-use zcash_primitives::{block::BlockHash, consensus::BlockHeight};
 
 pub fn init_db() -> Result<()> {
     let db_data = WalletDB::for_path(DATA_PATH, NETWORK)?;
@@ -25,24 +22,6 @@ pub fn init_db() -> Result<()> {
     let db_cache = BlockDB::for_path(CACHE_PATH)?;
     init_cache_database(&db_cache)?;
 
-    Ok(())
-}
-
-pub async fn init_account(lightnode_url: &str, viewing_key: String, height: u64) -> Result<()> {
-    let db_data = WalletDB::for_path(DATA_PATH, NETWORK)?;
-    let extfvks =
-        decode_extended_full_viewing_key(HRP_SAPLING_EXTENDED_FULL_VIEWING_KEY, &viewing_key)?
-            .ok_or(WalletError::Decode(viewing_key))?;
-    init_accounts_table(&db_data, &[extfvks])?;
-
-    let checkpoint = find_checkpoint(lightnode_url, height).await?;
-    init_blocks_table(
-        &db_data,
-        BlockHeight::from_u32(checkpoint.height as u32),
-        BlockHash::from_slice(&checkpoint.hash),
-        checkpoint.time,
-        &hex::decode(checkpoint.sapling_tree).unwrap(),
-    )?;
     Ok(())
 }
 

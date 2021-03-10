@@ -1,17 +1,23 @@
+use anyhow::Context;
+use chrono::NaiveDate;
 use clap::Clap;
-use std::fs::File;
-use zcash_coldwallet::sign::sign_tx;
-use zcash_coldwallet::transact::submit;
+use rand::thread_rng;
+use redjubjub::{PublicKeyPackage, SharePackage, SignatureShare};
+use zcash_coldwallet::multisig::multisig_gen;
+use zcash_coldwallet::sign::{combine, multi_sign_one, sign_tx};
+use zcash_coldwallet::transact::{make_commitments, pre_multi_sign, submit};
 use zcash_coldwallet::{
-    account::{init_account, get_balance},
+    account::{get_balance, init_account},
     chain::{init_db, sync},
     checkpoint::find_height,
+    constants::LIGHTNODE_URL,
+    create_file,
     grpc::RawTransaction,
     keys::generate_key,
+    read_from_file,
     transact::prepare_tx,
-    Opt, Result, Tx, WalletError, ZECUnit, constants::LIGHTNODE_URL,
+    Opt, Result, SigningNonces, Tx, TxBin, WalletError, ZECUnit,
 };
-use chrono::NaiveDate;
 
 #[derive(Clap)]
 struct ZCashColdWallet {
@@ -40,32 +46,39 @@ enum Command {
         amount: String,
         output_filename: Option<String>,
     },
+    MultiSigGen {
+        num_sigs: u32,
+        threshold: u32,
+    },
+    MultiSigPrepare {
+        my_index: u32,
+        tx_json_filename: Option<String>,
+        nonces_filename: Option<String>,
+    },
+    MultiSigPreSign {
+        spending_key: String,
+        tx_json_filename: Option<String>,
+    },
+    MultiSigSign {
+        nonce_filename: String,
+        secret_share_filename: String,
+        signature_filename: String,
+        tx_json_filename: Option<String>,
+    },
+    MultiSigCombine {
+        pubkeys_filename: String,
+        tx_json_filename: String,
+        raw_tx_filename: String,
+        signature_filename: Vec<String>,
+    },
     Sign {
         spending_key: String,
-        tx_json_file: Option<String>,
+        tx_json_filename: Option<String>,
         output_filename: Option<String>,
     },
     Submit {
         raw_tx_file: Option<String>,
     },
-}
-
-fn read_from_file(file_name: Option<String>) -> String {
-    let mut input: Box<dyn std::io::Read> = match file_name {
-        Some(file_name) => Box::new(File::open(file_name).unwrap()),
-        None => Box::new(std::io::stdin()),
-    };
-    let mut s = String::new();
-    input.read_to_string(&mut s).unwrap();
-    s.trim_end().to_string()
-}
-
-fn create_file(filename: Option<String>) -> Result<Box<dyn std::io::Write>> {
-    let output: Box<dyn std::io::Write> = match filename {
-        Some(file_name) => Box::new(File::create(file_name)?),
-        None => Box::new(std::io::stdout()),
-    };
-    Ok(output)
 }
 
 /*
@@ -83,6 +96,7 @@ submit raw_tx_bytes
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    let mut rng = thread_rng();
     let mut prog_opt = Opt {
         lightnode_url: LIGHTNODE_URL.to_string(),
         unit: ZECUnit::Zec,
@@ -98,7 +112,7 @@ async fn main() -> Result<()> {
         Command::Generate { output_filename } => {
             let mut output = create_file(output_filename)?;
             generate_key(&mut output)?
-        },
+        }
         Command::InitDb => init_db()?,
         Command::InitAccount {
             viewing_key,
@@ -110,7 +124,7 @@ async fn main() -> Result<()> {
                 u64::MAX
             };
             init_account(&prog_opt.lightnode_url, viewing_key, birth_height).await?
-        },
+        }
         Command::Sync => sync(&prog_opt.lightnode_url).await?,
         Command::GetBalance => get_balance(&prog_opt)?,
         Command::PrepareTx {
@@ -123,13 +137,85 @@ async fn main() -> Result<()> {
             let tx_json = serde_json::to_string(&tx)?;
             writeln!(output, "{}", tx_json)?;
         }
+        Command::MultiSigGen {
+            num_sigs,
+            threshold,
+        } => {
+            multisig_gen(num_sigs, threshold)?;
+        }
+        Command::MultiSigPrepare {
+            tx_json_filename,
+            my_index,
+            nonces_filename,
+        } => {
+            let tx_json = read_from_file(tx_json_filename.clone());
+            let tx: Tx = serde_json::from_str(&tx_json).or(Err(WalletError::TxParse))?;
+            let (tx, nonces) = make_commitments(my_index, tx, &mut rng);
+            let mut output = create_file(nonces_filename)?;
+            let nonces_json = serde_json::to_string(&nonces)?;
+            writeln!(output, "{}", nonces_json)?;
+            let mut output = create_file(tx_json_filename)?;
+            let tx_json = serde_json::to_string(&tx)?;
+            writeln!(output, "{}", tx_json)?;
+        }
+        Command::MultiSigPreSign {
+            spending_key,
+            tx_json_filename,
+        } => {
+            let tx_json = read_from_file(tx_json_filename.clone());
+            let tx: Tx = serde_json::from_str(&tx_json).or(Err(WalletError::TxParse))?;
+            let tx_bin = pre_multi_sign(spending_key, tx)?;
+            let mut output = create_file(tx_json_filename)?;
+            let tx_bin_json = serde_json::to_string(&tx_bin)?;
+            writeln!(output, "{}", tx_bin_json)?;
+        }
+        Command::MultiSigSign {
+            tx_json_filename,
+            nonce_filename,
+            secret_share_filename,
+            signature_filename,
+        } => {
+            let tx_json = read_from_file(tx_json_filename.clone());
+            let tx_bin: TxBin = serde_json::from_str(&tx_json)?;
+            let nonce_json = read_from_file(Some(nonce_filename));
+            let nonces: Vec<SigningNonces> = serde_json::from_str(&nonce_json).context("nonce")?;
+            let share_json = read_from_file(Some(secret_share_filename));
+            let share: SharePackage = serde_json::from_str(&share_json).context("share")?;
+            let signature_share = multi_sign_one(tx_bin, &nonces, share)?;
+            let signature_json = serde_json::to_string(&signature_share)?;
+            let mut output = create_file(Some(signature_filename))?;
+            writeln!(output, "{}", signature_json)?;
+        }
+        Command::MultiSigCombine {
+            pubkeys_filename,
+            tx_json_filename,
+            raw_tx_filename,
+            signature_filename,
+        } => {
+            let pubkeys_json = read_from_file(Some(pubkeys_filename));
+            let pubkeys: PublicKeyPackage = serde_json::from_str(&pubkeys_json)?;
+            let tx_json = read_from_file(Some(tx_json_filename));
+            let tx_bin: TxBin = serde_json::from_str(&tx_json)?;
+            let signatures = signature_filename
+                .iter()
+                .map(|filename| {
+                    let sig_json = read_from_file(Some(filename.clone()));
+                    let signature_share: Vec<SignatureShare> =
+                        serde_json::from_str(&sig_json).unwrap();
+                    signature_share
+                })
+                .collect::<Vec<_>>();
+            let raw_tx = combine(tx_bin, &pubkeys, &signatures)?;
+            let mut output = create_file(Some(raw_tx_filename))?;
+            writeln!(output, "{}", hex::encode(&raw_tx.data))?;
+        }
         Command::Sign {
             spending_key,
-            tx_json_file,
+            tx_json_filename,
             output_filename,
         } => {
             let mut output = create_file(output_filename)?;
-            let tx_json = read_from_file(tx_json_file);
+            let tx_json = read_from_file(tx_json_filename);
             let tx: Tx = serde_json::from_str(&tx_json).or(Err(WalletError::TxParse))?;
             let raw_tx = sign_tx(&spending_key, &tx, &prog_opt)?;
             writeln!(output, "{}", hex::encode(&raw_tx.data))?;

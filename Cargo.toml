@@ -19,9 +19,10 @@ jubjub = "0.5.1"
 funty = "=1.1.0"
 hex-literal = "0.3.1"
 clap = "3.0.0-beta.2"
-rand = "0.8.3"
+rand = "0.7.3"
 bigdecimal = "0.2.0"
 chrono = "0.4.19"
+group = "0.8.0"
 
 tracing = "0.1"
 tracing-subscriber = { version = "0.2.7", default-features = false, features = ["fmt", "ansi", "env-filter", "chrono", "tracing-log"] }
@@ -33,20 +34,19 @@ anyhow = "1.0.38"
 tonic-build = { version = "0.3.1", features = ["prost"] }
 
 [dependencies.zcash_client_backend]
-git = "https://github.com/zcash/librustzcash.git"
-rev = "b37b5876f2442a4115e553b998d7549045a87fbf"
+path = "../librustzcash/zcash_client_backend"
 
 [dependencies.zcash_client_sqlite]
-git = "https://github.com/zcash/librustzcash.git"
-rev = "b37b5876f2442a4115e553b998d7549045a87fbf"
+path = "../librustzcash/zcash_client_sqlite"
 
 [dependencies.zcash_primitives]
-git = "https://github.com/zcash/librustzcash.git"
-rev = "b37b5876f2442a4115e553b998d7549045a87fbf"
+path = "../librustzcash/zcash_primitives"
 
 [dependencies.zcash_proofs]
-git = "https://github.com/zcash/librustzcash.git"
-rev = "b37b5876f2442a4115e553b998d7549045a87fbf"
+path = "../librustzcash/zcash_proofs"
+
+[dependencies.redjubjub]
+path = "../redjubjub"
 
 [features]
 mainnet = []

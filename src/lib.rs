@@ -18,10 +18,14 @@ pub mod checkpoint;
 pub mod keys;
 pub mod sign;
 pub mod transact;
+pub mod multisig;
 
 pub const ACCOUNT: AccountId = AccountId(0);
 pub use anyhow::Result as Result;
 use tonic::transport::{ClientTlsConfig, Channel};
+use std::fs::File;
+use jubjub::ExtendedPoint;
+use group::GroupEncoding;
 
 #[derive(Debug, Clone)]
 pub enum ZECUnit {
@@ -87,14 +91,38 @@ pub struct Tx {
     output: Option<TxOut>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SigningCommitments {
+    index: u32,
+    randomizer: String, // ExtendedPoint
+    hiding: String,
+    binding: String,
+    randomizer_nonce: String, // Scalar
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SigningNonces {
+    randomizer: String,
+    hiding: String,
+    binding: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SigningShare {
+    pub index: u32,
+    pub commitment: SigningCommitments,
+    pub signature: Option<[u8; 32]>,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TxIn {
     diversifier: String,
-    addr: String,
+    fvk: String,
     amount: u64,
     z212: bool,
     rseed: String,
     witness: String,
+    multisigs: Vec<SigningShare>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -102,6 +130,15 @@ pub struct TxOut {
     addr: String,
     amount: u64,
     ovk: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TxBin {
+    bytes: String,
+    commitments: Vec<Vec<SigningCommitments>>,
+    sighash: String,
+    spend_indices: Vec<usize>,
+    output_indices: Vec<usize>,
 }
 
 pub const MAX_REORG_DEPTH: u64 = 3;
@@ -132,6 +169,36 @@ async fn connect_lightnode(lightnode_url: String) -> Result<CompactTxStreamerCli
     Ok(client)
 }
 
+pub fn read_from_file(file_name: Option<String>) -> String {
+    let mut input: Box<dyn std::io::Read> = match file_name {
+        Some(file_name) => Box::new(File::open(file_name).unwrap()),
+        None => Box::new(std::io::stdin()),
+    };
+    let mut s = String::new();
+    input.read_to_string(&mut s).unwrap();
+    s.trim_end().to_string()
+
+}
+
+pub fn create_file(filename: Option<String>) -> Result<Box<dyn std::io::Write>> {
+    let output: Box<dyn std::io::Write> = match filename {
+        Some(file_name) => Box::new(File::create(file_name)?),
+        None => Box::new(std::io::stdout()),
+    };
+    Ok(output)
+}
+
+pub fn decode_extended_point(s: &str) -> ExtendedPoint {
+    let mut b = [0u8; 32];
+    hex::decode_to_slice(s, &mut b).unwrap();
+    ExtendedPoint::from_bytes(&b).unwrap()
+}
+
+pub fn decode_scalar(s: &str) -> jubjub::Fr {
+    let mut b = [0u8; 32];
+    hex::decode_to_slice(s, &mut b).unwrap();
+    jubjub::Fr::from_bytes(&b).unwrap()
+}
 
 #[cfg(not(feature = "mainnet"))]
 pub mod constants {

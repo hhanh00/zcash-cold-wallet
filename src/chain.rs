@@ -80,24 +80,3 @@ pub async fn sync(lightnode_url: &str) -> Result<()> {
     Ok(())
 }
 
-#[cfg(test)]
-mod test {
-    use super::*;
-    use crate::{constants::LIGHTNODE_URL, ZECUnit};
-
-    #[test]
-    fn test_init() -> Result<()> {
-        init_db()?;
-        init_account(LIGHTNODE_URL, "zxviewtestsapling1q07ghkk6qqqqpqyqnt30u2gwd5j47fjldmtyunrm99qmaqhp2j3kpqg6k8mvyferpde3vgwndlumht98q29796a6wjujthsxterqh9sjhscaqsmx3tfc6rkt2k9qrkamzpcc5qcskak8cec6ukqysatjxhgdqthh6qnmd53sqfae8nw4z33uletfstrsf0umxpztc365h7vy4jmyw65q6ns5eqkljsquyldn80ssn6hly86zwkx39qvcvzl5psrhj85vcaln6ylacccxrr0kv".to_string(), 0)?;
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_sync() -> Result<()> {
-        let opts = Opt {
-            lightnode_url: LIGHTNODE_URL.to_string(),
-            unit: ZECUnit::Zat,
-        };
-        sync(&opts).await
-    }
-}

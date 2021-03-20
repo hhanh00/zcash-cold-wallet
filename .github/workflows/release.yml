@@ -3,7 +3,7 @@
 on: [push]
 
 jobs:
-  release:
+  release_linux:
     name: release linux
     runs-on: ubuntu-latest
     steps:
@@ -13,7 +13,7 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
-          target: x86_64-unknown-linux-gnu
+          default: true
           override: true
       - name: build
         run: cargo build --release && mv target/release/zcash-coldwallet target/release/zcash-coldwallet_amd64
@@ -23,5 +23,49 @@ jobs:
         with:
           files: |
             target/release/zcash-coldwallet_amd64
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  release_win:
+    name: release windows
+    runs-on: windows-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v1
+      - name: install rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          default: true
+          override: true
+      - name: build
+        run: cargo build --release
+      - name: release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            target/release/zcash-coldwallet_amd64.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  release_mac:
+    name: release mac
+    runs-on: macos-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v1
+      - name: install rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          default: true
+          override: true
+      - name: build
+        run: cargo build --release && mv target/release/zcash-coldwallet target/release/zcash-coldwallet_darwin
+      - name: release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            target/release/zcash-coldwallet_darwin
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

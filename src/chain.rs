@@ -71,6 +71,12 @@ pub async fn sync(lightnode_url: &str) -> Result<()> {
 
     println!("Synced to {}", synced_height);
 
+    scan()?;
+
+    Ok(())
+}
+
+pub fn scan() -> Result<()> {
     let cache = BlockDB::for_path(CACHE_PATH)?;
     let db_read = WalletDB::for_path(DATA_PATH, NETWORK)?;
     let mut data = db_read.get_update_ops()?;
@@ -79,4 +85,3 @@ pub async fn sync(lightnode_url: &str) -> Result<()> {
     println!("Scan completed");
     Ok(())
 }
-

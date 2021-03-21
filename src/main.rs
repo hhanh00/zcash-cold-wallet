@@ -4,7 +4,7 @@ use zcash_coldwallet::sign::sign_tx;
 use zcash_coldwallet::transact::submit;
 use zcash_coldwallet::{
     account::{init_account, get_balance},
-    chain::{init_db, sync},
+    chain::{init_db, sync, scan},
     checkpoint::find_height,
     grpc::RawTransaction,
     keys::generate_key,
@@ -16,7 +16,7 @@ use chrono::NaiveDate;
 #[derive(Clap)]
 struct ZCashColdWallet {
     #[clap(short, long)]
-    lightnode_url: Option<String>,
+    lightwalletd_url: Option<String>,
     #[clap(short, long, default_value = "Zec")]
     unit: ZECUnit,
     #[clap(subcommand)]
@@ -35,6 +35,7 @@ enum Command {
     },
     GetBalance,
     Sync,
+    ReIndex,
     PrepareTx {
         recipient_addr: String,
         amount: String,
@@ -89,7 +90,7 @@ async fn main() -> Result<()> {
     };
     let opts = ZCashColdWallet::parse();
     let cmd = opts.cmd;
-    if let Some(lightnode_url) = opts.lightnode_url {
+    if let Some(lightnode_url) = opts.lightwalletd_url {
         prog_opt.lightnode_url = lightnode_url;
     }
     prog_opt.unit = opts.unit;
@@ -117,6 +118,7 @@ async fn main() -> Result<()> {
             init_account(&prog_opt.lightnode_url, viewing_key, birth_height).await?
         },
         Command::Sync => sync(&prog_opt.lightnode_url).await?,
+        Command::ReIndex => scan()?,
         Command::GetBalance => get_balance(&prog_opt)?,
         Command::PrepareTx {
             amount,

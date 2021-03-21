@@ -22,6 +22,7 @@ pub mod transact;
 pub const ACCOUNT: AccountId = AccountId(0);
 pub use anyhow::Result as Result;
 use tonic::transport::{ClientTlsConfig, Channel};
+use zcash_client_backend::data_api::wallet::ANCHOR_OFFSET;
 
 #[derive(Debug, Clone)]
 pub enum ZECUnit {
@@ -104,7 +105,7 @@ pub struct TxOut {
     ovk: String,
 }
 
-pub const MAX_REORG_DEPTH: u64 = 3;
+pub const MAX_REORG_DEPTH: u64 = ANCHOR_OFFSET as u64;
 
 #[derive(Error, Debug, Clone)]
 pub enum WalletError {

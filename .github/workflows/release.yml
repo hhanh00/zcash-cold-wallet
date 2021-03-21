@@ -44,7 +44,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
-            target/release/zcash-coldwallet_amd64.exe
+            target/release/zcash-coldwallet.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   release_mac:

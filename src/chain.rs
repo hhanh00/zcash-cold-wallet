@@ -37,7 +37,7 @@ pub async fn sync(lightnode_url: &str) -> Result<()> {
         .query_row("SELECT MAX(height) FROM compactblocks", NO_PARAMS, |row| {
             Ok(row.get::<_, u32>(0).map(u64::from).map(|h| h + 1).ok())
         })?
-        .unwrap_or(u64::from(last_bh));
+        .unwrap_or_else(|| u64::from(last_bh));
     println!("Starting height: {}", start_height);
 
     let mut client = connect_lightnode(lightnode_url).await?;

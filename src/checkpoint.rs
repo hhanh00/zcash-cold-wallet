@@ -6,6 +6,7 @@ use crate::{
 };
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use zcash_primitives::consensus::{NetworkUpgrade, Parameters};
+use std::cmp::Ordering;
 
 pub struct Checkpoint {
     pub height: u64,
@@ -47,9 +48,11 @@ pub async fn find_height(lightnode_url: &str, date: &NaiveDate) -> Result<u64> {
         .await?
         .into_inner()
         .height;
-    let datetime = NaiveDateTime::new(date.clone(), NaiveTime::from_hms(0, 0, 0));
+    let datetime = NaiveDateTime::new(*date, NaiveTime::from_hms(0, 0, 0));
     let timestamp = datetime.timestamp() as u32;
 
+    // Note: strict ordering of timestamps is not guaranteed in blockchain
+    // It does not matter because we are just looking for an approximate starting block height
     let height = loop {
         if low >= high {
             break high;
@@ -63,12 +66,11 @@ pub async fn find_height(lightnode_url: &str, date: &NaiveDate) -> Result<u64> {
             .await?
             .into_inner();
         let height = block.height;
-        if timestamp == block.time {
-            break height;
-        } else if timestamp < block.time {
-            high = mid - 1;
-        } else {
-            low = mid + 1;
+        let c = timestamp.cmp(&block.time);
+        match c {
+            Ordering::Less => high = mid - 1,
+            Ordering::Greater => low = mid + 1,
+            Ordering::Equal => break height,
         }
     };
 

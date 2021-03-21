@@ -35,12 +35,12 @@ impl FromStr for ZECUnit {
     type Err = std::io::Error;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s {
-            "Zat" => return Ok(ZECUnit::Zat),
-            "MilliZec" => return Ok(ZECUnit::MilliZec),
-            "Zec" => return Ok(ZECUnit::Zec),
+        Ok(match s {
+            "Zat" => ZECUnit::Zat,
+            "MilliZec" => ZECUnit::MilliZec,
+            "Zec" => ZECUnit::Zec,
             _ => panic!("Unit must be one of Zat, MilliZec or Zec"),
-        }
+        })
     }
 }
 

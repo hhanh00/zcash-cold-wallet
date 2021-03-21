@@ -11,7 +11,7 @@ use zcash_primitives::{
 
 pub fn prepare_tx(to_addr: &str, amount: String, unit: &ZECUnit) -> Result<Tx> {
     let satoshis = unit.to_satoshis(&amount);
-    let to_addr = RecipientAddress::decode(&NETWORK, to_addr).ok_or(WalletError::Decode(to_addr.to_string()))?;
+    let to_addr = RecipientAddress::decode(&NETWORK, to_addr).ok_or_else(|| WalletError::Decode(to_addr.to_string()))?;
     let amount = Amount::from_u64(satoshis).expect("Invalid amount");
     let wallet_db = WalletDB::for_path(DATA_PATH, NETWORK)?;
     let fvks = wallet_db.get_extended_full_viewing_keys()?;

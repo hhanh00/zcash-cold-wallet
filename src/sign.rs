@@ -13,7 +13,7 @@ use zcash_proofs::prover::LocalTxProver;
 
 pub fn sign_tx(spending_key: &str, tx: &Tx, opts: &Opt) -> Result<RawTransaction> {
     let extsk = decode_extended_spending_key(HRP_SAPLING_EXTENDED_SPENDING_KEY, &spending_key)?
-        .ok_or(WalletError::Decode(spending_key.to_string()))?;
+        .ok_or_else(|| WalletError::Decode(spending_key.to_string()))?;
     let ovk = extsk.expsk.ovk;
     let prover = LocalTxProver::with_default_location().ok_or(WalletError::Prover)?;
     let height = BlockHeight::from_u32(tx.height as u32);

@@ -96,8 +96,13 @@ async fn main() -> Result<()> {
 
     match cmd {
         Command::Generate { output_filename } => {
+            let keys = generate_key()?;
             let mut output = create_file(output_filename)?;
-            generate_key(&mut output)?
+            writeln!(output, "seed phrase: {}", keys.phrase)?;
+            writeln!(output, "spending key: {}", keys.spending_key)?;
+            writeln!(output, "derivation path: {}", keys.derivation_path)?;
+            writeln!(output, "viewing key: {}", keys.viewing_key)?;
+            writeln!(output, "payment address: {}", keys.address)?;
         },
         Command::InitDb => init_db()?,
         Command::InitAccount {

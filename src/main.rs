@@ -12,6 +12,7 @@ use zcash_coldwallet::{
     Opt, Result, Tx, WalletError, ZECUnit, constants::LIGHTNODE_URL,
 };
 use chrono::NaiveDate;
+use zcash_proofs::prover::LocalTxProver;
 
 #[derive(Clap)]
 struct ZCashColdWallet {
@@ -135,10 +136,11 @@ async fn main() -> Result<()> {
             tx_json_file,
             output_filename,
         } => {
+            let prover = LocalTxProver::with_default_location().ok_or(WalletError::Prover)?;
             let mut output = create_file(output_filename)?;
             let tx_json = read_from_file(tx_json_file);
             let tx: Tx = serde_json::from_str(&tx_json).or(Err(WalletError::TxParse))?;
-            let raw_tx = sign_tx(&spending_key, &tx, &prog_opt)?;
+            let raw_tx = sign_tx(&spending_key, &tx, &prog_opt, prover)?;
             writeln!(output, "{}", hex::encode(&raw_tx.data))?;
         }
         Command::Submit { raw_tx_file } => {

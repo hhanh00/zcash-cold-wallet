@@ -2,7 +2,7 @@ use crate::Result;
 use bip39::{Language, Mnemonic, Seed};
 use rand::rngs::OsRng;
 use rand::RngCore;
-use zcash_client_backend::encoding::{encode_extended_full_viewing_key, encode_extended_spending_key, encode_payment_address};
+use zcash_client_backend::encoding::{encode_extended_full_viewing_key, encode_extended_spending_key, encode_payment_address, decode_payment_address};
 use crate::constants::{HRP_SAPLING_EXTENDED_FULL_VIEWING_KEY, HRP_SAPLING_EXTENDED_SPENDING_KEY, HRP_SAPLING_PAYMENT_ADDRESS, COIN_TYPE};
 use zcash_primitives::zip32::{ChildIndex, ExtendedSpendingKey, ExtendedFullViewingKey};
 use serde::Serialize;
@@ -42,4 +42,8 @@ pub fn generate_key() -> Result<Keys> {
         viewing_key,
         address,
     })
+}
+
+pub fn check_address(address: &str) -> bool {
+    decode_payment_address(HRP_SAPLING_PAYMENT_ADDRESS, &address).is_ok()
 }

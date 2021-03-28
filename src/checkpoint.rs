@@ -5,8 +5,8 @@ use crate::{
     Result,
 };
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
-use zcash_primitives::consensus::{NetworkUpgrade, Parameters};
 use std::cmp::Ordering;
+use zcash_primitives::consensus::{NetworkUpgrade, Parameters};
 
 pub struct Checkpoint {
     pub height: u64,

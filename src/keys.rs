@@ -1,11 +1,18 @@
+use crate::constants::{
+    COIN_TYPE, HRP_SAPLING_EXTENDED_FULL_VIEWING_KEY, HRP_SAPLING_EXTENDED_SPENDING_KEY,
+    HRP_SAPLING_PAYMENT_ADDRESS,
+};
 use crate::Result;
+use anyhow::Context;
 use bip39::{Language, Mnemonic, Seed};
 use rand::rngs::OsRng;
 use rand::RngCore;
-use zcash_client_backend::encoding::{encode_extended_full_viewing_key, encode_extended_spending_key, encode_payment_address, decode_payment_address};
-use crate::constants::{HRP_SAPLING_EXTENDED_FULL_VIEWING_KEY, HRP_SAPLING_EXTENDED_SPENDING_KEY, HRP_SAPLING_PAYMENT_ADDRESS, COIN_TYPE};
-use zcash_primitives::zip32::{ChildIndex, ExtendedSpendingKey, ExtendedFullViewingKey};
 use serde::Serialize;
+use zcash_client_backend::encoding::{
+    decode_extended_full_viewing_key, decode_extended_spending_key, decode_payment_address,
+    encode_extended_full_viewing_key, encode_extended_spending_key, encode_payment_address,
+};
+use zcash_primitives::zip32::{ChildIndex, ExtendedFullViewingKey, ExtendedSpendingKey};
 
 #[derive(Serialize)]
 pub struct Keys {
@@ -46,4 +53,42 @@ pub fn generate_key() -> Result<Keys> {
 
 pub fn check_address(address: &str) -> bool {
     decode_payment_address(HRP_SAPLING_PAYMENT_ADDRESS, &address).is_ok()
+}
+
+pub fn get_address(viewing_key: &str) -> anyhow::Result<String> {
+    let fvk = decode_extended_full_viewing_key(HRP_SAPLING_EXTENDED_FULL_VIEWING_KEY, viewing_key)?;
+    let fvk = fvk.context("invalid fvk")?;
+    let (_, address) = fvk.default_address().unwrap();
+    let address = encode_payment_address(HRP_SAPLING_PAYMENT_ADDRESS, &address);
+    Ok(address)
+}
+
+pub enum KeyType {
+    VIEWING_KEY,
+    SECRET_KEY,
+    UNKNOWN,
+}
+
+fn valid_key<T, E>(s: std::result::Result<Option<T>, E>) -> bool {
+    match s {
+        Err(_) => false,
+        Ok(None) => false,
+        _ => true,
+    }
+}
+
+pub fn get_key_type(key: &str) -> KeyType {
+    if valid_key(decode_extended_full_viewing_key(
+        HRP_SAPLING_EXTENDED_FULL_VIEWING_KEY,
+        key,
+    )) {
+        return KeyType::VIEWING_KEY;
+    }
+    if valid_key(decode_extended_spending_key(
+        HRP_SAPLING_EXTENDED_SPENDING_KEY,
+        key,
+    )) {
+        return KeyType::SECRET_KEY;
+    }
+    KeyType::UNKNOWN
 }

@@ -1,20 +1,30 @@
-use crate::constants::{HRP_SAPLING_PAYMENT_ADDRESS, NETWORK};
-use crate::{grpc::RawTransaction, Result, Tx, TxIn, TxOut, ACCOUNT, DATA_PATH, WalletError, connect_lightnode, ZECUnit, Opt};
+use crate::constants::{HRP_SAPLING_PAYMENT_ADDRESS, NETWORK, LIGHTNODE_URL};
+use crate::sign::sign_tx;
+use crate::{
+    connect_lightnode, grpc::RawTransaction, Opt, Result, Tx, TxIn, TxOut, WalletError, ZECUnit,
+    ACCOUNT, DATA_PATH,
+};
+use std::path::PathBuf;
 use zcash_client_backend::{
     address::RecipientAddress, data_api::WalletRead, encoding::encode_payment_address,
 };
 use zcash_client_sqlite::WalletDB;
+use zcash_primitives::consensus::BlockHeight;
 use zcash_primitives::{
     primitives::Rseed,
     transaction::components::{amount::DEFAULT_FEE, Amount},
 };
-use crate::sign::sign_tx;
-use std::path::PathBuf;
 
-pub fn prepare_tx(directory_path: &str, to_addr: &str, amount: String, unit: &ZECUnit) -> Result<Tx> {
+pub fn prepare_tx(
+    directory_path: &str,
+    to_addr: &str,
+    amount: String,
+    unit: &ZECUnit,
+) -> Result<Tx> {
     let data_path: PathBuf = [directory_path, DATA_PATH].iter().collect();
     let satoshis = unit.to_satoshis(&amount);
-    let to_addr = RecipientAddress::decode(&NETWORK, to_addr).ok_or_else(|| WalletError::Decode(to_addr.to_string()))?;
+    let to_addr = RecipientAddress::decode(&NETWORK, to_addr)
+        .ok_or_else(|| WalletError::Decode(to_addr.to_string()))?;
     let amount = Amount::from_u64(satoshis).expect("Invalid amount");
     let wallet_db = WalletDB::for_path(data_path, NETWORK)?;
     let fvks = wallet_db.get_extended_full_viewing_keys()?;
@@ -30,9 +40,10 @@ pub fn prepare_tx(directory_path: &str, to_addr: &str, amount: String, unit: &ZE
     // Confirm we were able to select sufficient value
     let selected_value: Amount = spendable_notes.iter().map(|n| n.note_value).sum();
     if selected_value < target_value {
-        return Err(WalletError::NotEnoughFunds(u64::from(selected_value),
+        return Err(WalletError::NotEnoughFunds(
+            u64::from(selected_value),
             u64::from(target_value),
-            unit.clone()
+            unit.clone(),
         )
         .into());
     }
@@ -86,15 +97,24 @@ pub fn prepare_tx(directory_path: &str, to_addr: &str, amount: String, unit: &ZE
     Ok(tx)
 }
 
-pub async fn submit(raw_tx: RawTransaction, lightnode_url: &str) -> Result<()> {
+pub async fn submit(raw_tx: RawTransaction, lightnode_url: &str) -> Result<String> {
     let mut client = connect_lightnode(lightnode_url.to_string()).await?;
     let r = client.send_transaction(raw_tx).await?.into_inner();
 
     if r.error_code != 0 {
-        return Err(WalletError::Submit(r.error_code, r.error_message).into())
+        return Err(WalletError::Submit(r.error_code, r.error_message).into());
     }
-    println!("Success! tx id: {}", r.error_message);
+    let message = r.error_message;
+    println!("Success! tx id: {}", message);
 
-    Ok(())
+    Ok(message)
 }
 
+pub async fn submit_data(data: &[u8]) -> Result<String> {
+    let raw_tx = RawTransaction {
+        data: Vec::from(data),
+        height: 0,
+    };
+    let message = submit(raw_tx, LIGHTNODE_URL).await?;
+    Ok(message)
+}

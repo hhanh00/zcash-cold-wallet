@@ -1,15 +1,19 @@
-use crate::{checkpoint::find_checkpoint, constants::{HRP_SAPLING_EXTENDED_FULL_VIEWING_KEY, NETWORK}, Opt, Result, WalletError, DATA_PATH, ZECUnit};
+use crate::{
+    checkpoint::find_checkpoint,
+    constants::{HRP_SAPLING_EXTENDED_FULL_VIEWING_KEY, NETWORK},
+    Opt, Result, WalletError, ZECUnit, DATA_PATH,
+};
+use anyhow::Context;
 use rusqlite::{Connection, NO_PARAMS};
+use std::path::PathBuf;
+use zcash_client_backend::data_api::WalletRead;
 use zcash_client_backend::encoding::decode_extended_full_viewing_key;
 use zcash_client_sqlite::{
     wallet::init::{init_accounts_table, init_blocks_table},
     WalletDB,
 };
+use zcash_primitives::consensus::{NetworkUpgrade, Parameters};
 use zcash_primitives::{block::BlockHash, consensus::BlockHeight};
-use anyhow::Context;
-use std::path::PathBuf;
-use zcash_primitives::consensus::{Parameters, NetworkUpgrade};
-use zcash_client_backend::data_api::WalletRead;
 
 pub fn has_account(directory_path: &str) -> Result<bool> {
     let data_path: PathBuf = [directory_path, DATA_PATH].iter().collect();
@@ -18,8 +22,16 @@ pub fn has_account(directory_path: &str) -> Result<bool> {
     Ok(!keys.is_empty())
 }
 
-pub async fn init_account(directory_path: &str, lightnode_url: &str, viewing_key: &str, height: u64) -> Result<()> {
-    let sapling_activation_height: u64 = crate::constants::NETWORK.activation_height(NetworkUpgrade::Sapling).unwrap().into();
+pub async fn init_account(
+    directory_path: &str,
+    lightnode_url: &str,
+    viewing_key: &str,
+    height: u64,
+) -> Result<()> {
+    let sapling_activation_height: u64 = crate::constants::NETWORK
+        .activation_height(NetworkUpgrade::Sapling)
+        .unwrap()
+        .into();
     let height = height.max(sapling_activation_height);
     let data_path: PathBuf = [directory_path, DATA_PATH].iter().collect();
     let db_data = WalletDB::for_path(data_path, NETWORK)?;
@@ -35,7 +47,8 @@ pub async fn init_account(directory_path: &str, lightnode_url: &str, viewing_key
         BlockHash::from_slice(&checkpoint.hash),
         checkpoint.time,
         &hex::decode(checkpoint.sapling_tree).unwrap(),
-    ).context("init_blocks_table")?;
+    )
+    .context("init_blocks_table")?;
     Ok(())
 }
 

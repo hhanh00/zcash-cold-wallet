@@ -1,21 +1,17 @@
 use crate::{
     connect_lightnode,
     constants::NETWORK,
-    grpc::{BlockId, BlockRange, ChainSpec},
+    grpc::{BlockId, BlockRange, ChainSpec, RawTransaction},
     Result, WalletError, CACHE_PATH, DATA_PATH, MAX_REORG_DEPTH,
 };
 use anyhow::Context;
 use prost::{bytes::BytesMut, Message};
 use rusqlite::{params, Connection, NO_PARAMS};
-use zcash_client_backend::{
-    data_api::{chain::scan_cached_blocks, WalletRead}
-};
-use zcash_client_sqlite::{
-    chain::init::init_cache_database,
-    wallet::init::init_wallet_db,
-    BlockDB, WalletDB,
-};
 use std::path::PathBuf;
+use zcash_client_backend::data_api::{chain::scan_cached_blocks, WalletRead};
+use zcash_client_sqlite::{
+    chain::init::init_cache_database, wallet::init::init_wallet_db, BlockDB, WalletDB,
+};
 
 pub fn init_db(directory_path: &str) -> Result<()> {
     let data_path: PathBuf = [directory_path, DATA_PATH].iter().collect();
@@ -52,7 +48,8 @@ pub async fn sync(directory_path: &str, lightnode_url: &str, max_blocks: u32) ->
         .await?
         .into_inner();
 
-    let synced_height = (latest_block.height - MAX_REORG_DEPTH).min(start_height.saturating_add(max_blocks as u64));
+    let synced_height =
+        (latest_block.height - MAX_REORG_DEPTH).min(start_height.saturating_add(max_blocks as u64));
     let mut blocks = client
         .get_block_range(tonic::Request::new(BlockRange {
             start: Some(BlockId {
@@ -93,3 +90,4 @@ pub fn scan(directory_path: &str) -> Result<()> {
     log::debug!("Scan completed");
     Ok(())
 }
+

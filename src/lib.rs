@@ -1,10 +1,10 @@
+use crate::grpc::compact_tx_streamer_client::CompactTxStreamerClient;
 use bigdecimal::{BigDecimal, ToPrimitive};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
-use zcash_client_backend::wallet::AccountId;
 use thiserror::Error;
-use crate::grpc::compact_tx_streamer_client::CompactTxStreamerClient;
 use tonic::transport::Certificate;
+use zcash_client_backend::wallet::AccountId;
 
 pub const DATA_PATH: &str = "data.sqlite3";
 pub const CACHE_PATH: &str = "cache.sqlite3";
@@ -21,8 +21,8 @@ pub mod sign;
 pub mod transact;
 
 pub const ACCOUNT: AccountId = AccountId(0);
-pub use anyhow::Result as Result;
-use tonic::transport::{ClientTlsConfig, Channel};
+pub use anyhow::Result;
+use tonic::transport::{Channel, ClientTlsConfig};
 use zcash_client_backend::data_api::wallet::ANCHOR_OFFSET;
 
 #[derive(Debug, Clone)]
@@ -144,7 +144,6 @@ async fn connect_lightnode(lightnode_url: String) -> Result<CompactTxStreamerCli
     let client = CompactTxStreamerClient::connect(channel).await?;
     Ok(client)
 }
-
 
 #[cfg(not(feature = "mainnet"))]
 pub mod constants {

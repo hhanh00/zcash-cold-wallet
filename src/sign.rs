@@ -11,12 +11,23 @@ use zcash_primitives::{
 };
 use zcash_proofs::prover::LocalTxProver;
 
-pub fn sign_tx_with_bytes(spending_key: &str, tx: &Tx, opts: &Opt, spend_params: &[u8], output_params: &[u8]) -> Result<RawTransaction> {
+pub fn sign_tx_with_bytes(
+    spending_key: &str,
+    tx: &Tx,
+    opts: &Opt,
+    spend_params: &[u8],
+    output_params: &[u8],
+) -> Result<RawTransaction> {
     let prover = LocalTxProver::from_bytes(spend_params, output_params);
     sign_tx(spending_key, tx, opts, prover)
 }
 
-pub fn sign_tx(spending_key: &str, tx: &Tx, opts: &Opt, prover: LocalTxProver) -> Result<RawTransaction> {
+pub fn sign_tx(
+    spending_key: &str,
+    tx: &Tx,
+    opts: &Opt,
+    prover: LocalTxProver,
+) -> Result<RawTransaction> {
     let extsk = decode_extended_spending_key(HRP_SAPLING_EXTENDED_SPENDING_KEY, &spending_key)?
         .ok_or_else(|| WalletError::Decode(spending_key.to_string()))?;
     let ovk = extsk.expsk.ovk;

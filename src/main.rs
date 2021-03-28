@@ -1,17 +1,18 @@
+use chrono::NaiveDate;
 use clap::Clap;
 use std::fs::File;
 use zcash_coldwallet::sign::sign_tx;
 use zcash_coldwallet::transact::submit;
 use zcash_coldwallet::{
-    account::{init_account, get_balance},
-    chain::{init_db, sync, scan},
+    account::{get_balance, init_account},
+    chain::{init_db, scan, sync},
     checkpoint::find_height,
+    constants::LIGHTNODE_URL,
     grpc::RawTransaction,
     keys::generate_key,
     transact::prepare_tx,
-    Opt, Result, Tx, WalletError, ZECUnit, constants::LIGHTNODE_URL,
+    Opt, Result, Tx, WalletError, ZECUnit,
 };
-use chrono::NaiveDate;
 use zcash_proofs::prover::LocalTxProver;
 
 #[derive(Clap)]
@@ -105,7 +106,7 @@ async fn main() -> Result<()> {
             writeln!(output, "derivation path: {}", keys.derivation_path)?;
             writeln!(output, "viewing key: {}", keys.viewing_key)?;
             writeln!(output, "payment address: {}", keys.address)?;
-        },
+        }
         Command::InitDb => init_db("")?,
         Command::InitAccount {
             viewing_key,
@@ -117,10 +118,14 @@ async fn main() -> Result<()> {
                 u64::MAX
             };
             init_account("", &prog_opt.lightnode_url, &viewing_key, birth_height).await?
-        },
-        Command::Sync => { sync("", &prog_opt.lightnode_url, u32::MAX).await?; }
+        }
+        Command::Sync => {
+            sync("", &prog_opt.lightnode_url, u32::MAX).await?;
+        }
         Command::ReIndex => scan("")?,
-        Command::GetBalance => { get_balance("", prog_opt.unit)?; }
+        Command::GetBalance => {
+            get_balance("", prog_opt.unit)?;
+        }
         Command::PrepareTx {
             amount,
             recipient_addr,

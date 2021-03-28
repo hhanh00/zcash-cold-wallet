@@ -8,7 +8,7 @@ edition = "2018"
 
 [dependencies]
 tonic = { version = "0.3.1", features = ["tls", "tokio", "tls-roots"] }
-tokio = { version = "0.2.13", features = ["macros"] }
+tokio = { version = "0.2.13", features = ["macros", "blocking"] }
 prost = "0.6"
 tiny-bip39 = "0.8"
 rusqlite = "0.24.2"
@@ -28,6 +28,9 @@ tracing-subscriber = { version = "0.2.7", default-features = false, features = [
 
 thiserror = "1.0.24"
 anyhow = "1.0.38"
+
+android_logger = "0.10.0"
+log = "0.4.14"
 
 [build-dependencies]
 tonic-build = { version = "0.3.1", features = ["prost"] }

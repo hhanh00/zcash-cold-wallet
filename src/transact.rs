@@ -1,5 +1,5 @@
 use crate::constants::{HRP_SAPLING_PAYMENT_ADDRESS, NETWORK};
-use crate::{grpc::RawTransaction, Result, Tx, TxIn, TxOut, ACCOUNT, DATA_PATH, WalletError, connect_lightnode, ZECUnit};
+use crate::{grpc::RawTransaction, Result, Tx, TxIn, TxOut, ACCOUNT, DATA_PATH, WalletError, connect_lightnode, ZECUnit, Opt};
 use zcash_client_backend::{
     address::RecipientAddress, data_api::WalletRead, encoding::encode_payment_address,
 };
@@ -8,12 +8,15 @@ use zcash_primitives::{
     primitives::Rseed,
     transaction::components::{amount::DEFAULT_FEE, Amount},
 };
+use crate::sign::sign_tx;
+use std::path::PathBuf;
 
-pub fn prepare_tx(to_addr: &str, amount: String, unit: &ZECUnit) -> Result<Tx> {
+pub fn prepare_tx(directory_path: &str, to_addr: &str, amount: String, unit: &ZECUnit) -> Result<Tx> {
+    let data_path: PathBuf = [directory_path, DATA_PATH].iter().collect();
     let satoshis = unit.to_satoshis(&amount);
     let to_addr = RecipientAddress::decode(&NETWORK, to_addr).ok_or_else(|| WalletError::Decode(to_addr.to_string()))?;
     let amount = Amount::from_u64(satoshis).expect("Invalid amount");
-    let wallet_db = WalletDB::for_path(DATA_PATH, NETWORK)?;
+    let wallet_db = WalletDB::for_path(data_path, NETWORK)?;
     let fvks = wallet_db.get_extended_full_viewing_keys()?;
     let extfvk = &fvks[&ACCOUNT];
     let ovk = extfvk.fvk.ovk;
@@ -94,3 +97,4 @@ pub async fn submit(raw_tx: RawTransaction, lightnode_url: &str) -> Result<()> {
 
     Ok(())
 }
+

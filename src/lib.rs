@@ -115,7 +115,7 @@ pub struct TxOut {
     ovk: String,
 }
 
-pub const MAX_REORG_DEPTH: u64 = ANCHOR_OFFSET as u64;
+pub const MAX_REORG_DEPTH: u64 = 0u64;
 
 #[derive(Error, Debug, Clone)]
 pub enum WalletError {

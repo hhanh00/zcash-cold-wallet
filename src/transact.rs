@@ -32,8 +32,9 @@ pub fn prepare_tx(
     let ovk = extfvk.fvk.ovk;
 
     // Target the next block, assuming we are up-to-date.
-    let (height, anchor_height) = wallet_db.get_target_and_anchor_heights()?.unwrap();
+    let (height, _) = wallet_db.get_target_and_anchor_heights()?.unwrap();
 
+    let anchor_height = height - 1;
     let target_value = amount + DEFAULT_FEE;
     let spendable_notes = wallet_db.select_spendable_notes(ACCOUNT, target_value, anchor_height)?;
 

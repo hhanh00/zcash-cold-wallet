@@ -6,7 +6,7 @@ use crate::{
 };
 use anyhow::Context;
 use prost::{bytes::BytesMut, Message};
-use rusqlite::{params, Connection, NO_PARAMS};
+use rusqlite::{params, Connection, NO_PARAMS, OptionalExtension};
 use std::path::PathBuf;
 use zcash_client_backend::data_api::{chain::scan_cached_blocks, WalletRead};
 use zcash_client_sqlite::{
@@ -91,3 +91,11 @@ pub fn scan(directory_path: &str) -> Result<()> {
     Ok(())
 }
 
+pub fn get_height(directory_path: &str) -> Result<Option<u32>> {
+    let data_path: PathBuf = [directory_path, DATA_PATH].iter().collect();
+    let data_connection = Connection::open(data_path.clone())?;
+    data_connection
+        .query_row("SELECT MAX(height) FROM blocks", NO_PARAMS, |row| {
+            row.get::<_, u32>(0)
+        }).optional().context("SQL error")
+}

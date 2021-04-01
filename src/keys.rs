@@ -55,9 +55,15 @@ pub fn check_address(address: &str) -> bool {
     decode_payment_address(HRP_SAPLING_PAYMENT_ADDRESS, &address).is_ok()
 }
 
+pub fn get_viewing_key(secret_key: &str) -> anyhow::Result<String> {
+    let sk = decode_extended_spending_key(HRP_SAPLING_EXTENDED_SPENDING_KEY, secret_key)?.context("Invalid sk")?;
+    let fvk = ExtendedFullViewingKey::from(&sk);
+    let fvk = encode_extended_full_viewing_key(HRP_SAPLING_EXTENDED_FULL_VIEWING_KEY, &fvk);
+    Ok(fvk)
+}
+
 pub fn get_address(viewing_key: &str) -> anyhow::Result<String> {
-    let fvk = decode_extended_full_viewing_key(HRP_SAPLING_EXTENDED_FULL_VIEWING_KEY, viewing_key)?;
-    let fvk = fvk.context("invalid fvk")?;
+    let fvk = decode_extended_full_viewing_key(HRP_SAPLING_EXTENDED_FULL_VIEWING_KEY, viewing_key)?.context("Invalid fvk")?;
     let (_, address) = fvk.default_address().unwrap();
     let address = encode_payment_address(HRP_SAPLING_PAYMENT_ADDRESS, &address);
     Ok(address)
